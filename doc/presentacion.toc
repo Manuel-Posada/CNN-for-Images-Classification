@@ -1,0 +1,10 @@
+\babel@toc {spanish}{}\relax 
+\beamer@sectionintoc {1}{Contexto y Motivación}{3}{0}{1}
+\beamer@sectionintoc {2}{Conceptos Básicos de IA}{7}{0}{2}
+\beamer@sectionintoc {3}{El Dataset}{15}{0}{3}
+\beamer@sectionintoc {4}{Arquitectura de la Red}{19}{0}{4}
+\beamer@sectionintoc {5}{Tecnologías Usadas}{28}{0}{5}
+\beamer@sectionintoc {6}{API REST, FastAPI y Streamlit}{32}{0}{6}
+\beamer@sectionintoc {7}{Cómo Funciona la Aplicación}{46}{0}{7}
+\beamer@sectionintoc {8}{Cómo Ejecutarlo}{59}{0}{8}
+\beamer@sectionintoc {9}{Conclusiones}{63}{0}{9}

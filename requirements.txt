@@ -1,24 +1,24 @@
 # --- Web / API ---
-fastapi>=0.110
-uvicorn[standard]>=0.29
-streamlit>=1.36
+fastapi
+uvicorn[standard]
+streamlit
 
 # --- IA: frameworks principales ---
-tensorflow>=2.16      # CPU (usa tensorflow-gpu si vas a GPU)
-torch>=2.2
-torchvision>=0.17
-torchaudio>=2.2
+tensorflow      # CPU (usa tensorflow-gpu si vas a GPU)
+torch
+torchvision
+torchaudio
 
 # --- Preprocesamiento de datos ---
-pandas>=2.2
-numpy>=1.26
-scikit-learn>=1.4
+pandas
+numpy
+scikit-learn
 
 # --- Imagen y audio ---
-Pillow>=10.3          # Para manejo de imágenes en Streamlit / PIL
-soundfile>=0.12       # Lectura de audio en preprocess
-librosa>=0.10         # Opcional: espectrogramas y features de audio
+Pillow          # Para manejo de imágenes en Streamlit / PIL
+soundfile      # Lectura de audio en preprocess
+librosa        # Opcional: espectrogramas y features de audio
 
 # --- Otros útiles ---
-requests>=2.31        # Streamlit → FastAPI POST
-python-multipart>=0.0.9  # Carga de archivos en FastAPI
+requests      # Streamlit → FastAPI POST
+python-multipart  # Carga de archivos en FastAPI

@@ -3,6 +3,8 @@ Funciones de preprocesamiento para datos tabulares, de imagen y de audio.
 Se usan tanto en entrenamiento como en predicción.
 """
 import io
+import joblib
+from pathlib import Path
 import numpy as np
 import pandas as pd
 from typing import Tuple
@@ -16,27 +18,75 @@ import librosa
 # -----------------------------
 # Tabular
 # -----------------------------
-def preprocess_tabular(df: pd.DataFrame) -> [ np.ndarray | None]: # type: ignore
-    """
-    Limpia y normaliza un DataFrame.
-    Si el CSV de entrenamiento incluye una columna 'target', la separa.
-    Retorna (X, y) o (X, None) si no hay target.
-    """
-
+def preprocess_tabular(df: pd.DataFrame, target_column: str = None) -> tuple[np.ndarray, np.ndarray | None]:
     df = df.copy()
 
-    df = df.drop(columns="target", errors="ignore")
-    
-    # Normalización by Scaler
+    # Separar y antes de limpiar X
+    y = None
+    if target_column and target_column in df.columns:
+        y = df[target_column].values
+        df = df.drop(columns=[target_column])
+
+    # Limpiar columnas con strings numéricos mal formateados
+    for col in df.columns:
+        if df[col].dtype == object:
+            df[col] = (
+                df[col]
+                .str.replace('.', '', regex=False)  # quitar puntos de miles
+                .str.replace(',', '.', regex=False) # coma decimal a punto
+            )
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+
+    df = df.fillna(0)
+
     scaler = StandardScaler()
-    print(f"scalar values : {df.astype(np.float32)}")
     X = scaler.fit_transform(df.astype(np.float32))
-    
-    
-    return X
+
+    return X, y
+
 
 # -----------------------------
-# Imágenes
+# Tabular - registro único (interfaz de predicción manual)
+# -----------------------------
+# Columnas de entrada del dataset Iris.
+TABULAR_FEATURE_COLUMNS = [
+    "sepal length (cm)",
+    "sepal width (cm)",
+    "petal length (cm)",
+    "petal width (cm)",
+]
+
+SCALER_PATH = Path("models/saved/tabular_scaler.pkl")
+
+
+def _load_or_fit_scaler() -> StandardScaler:
+    """Carga el scaler guardado durante el entrenamiento; si aún no existe,
+    ajusta uno de referencia con el dataset Iris para poder predecir de inmediato."""
+    if SCALER_PATH.exists():
+        return joblib.load(SCALER_PATH)
+
+    ref_csv = Path("datasets/tabular/iris.csv")
+    if ref_csv.exists():
+        df = pd.read_csv(ref_csv)
+        if "target" in df.columns:
+            df = df.drop(columns=["target"])
+        scaler = StandardScaler().fit(df.astype(np.float32))
+    else:
+        scaler = StandardScaler()
+
+    SCALER_PATH.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(scaler, SCALER_PATH)
+    return scaler
+
+
+def preprocess_tabular_record(values: list[float]) -> np.ndarray:
+    """Convierte un único registro (4 medidas de la flor) en la matriz que
+    espera el modelo, aplicando el mismo escalado usado en el entrenamiento."""
+    scaler = _load_or_fit_scaler()
+    df = pd.DataFrame([values], columns=TABULAR_FEATURE_COLUMNS)
+    return scaler.transform(df.astype(np.float32))
+
+
 # -----------------------------
 def preprocess_image(file_bytes: bytes, size: Tuple[int, int] = (128, 128)) -> np.ndarray:
     """

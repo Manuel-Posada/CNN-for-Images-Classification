@@ -1,71 +1,91 @@
 import streamlit as st
 import requests
-import pandas as pd
 
 FASTAPI_URL = "http://localhost:8000"
 
-st.title("Demo Multimodal con TensorFlow / PyTorch")
+st.title("Demo Microservicio mostrado a JU / PyTorch")
 
-data_type = st.selectbox("Tipo de dato", ["tabular", "image", "audio"])
-framework = st.selectbox("Framework", ["tensorflow", "pytorch"])
-mode = st.radio("Modo de operación", ["Entrenar", "Predecir"])   
+# Pestañas principales (solo predicción; el entrenamiento se hace en Jupyter)
+tab_tabular, tab_imagen = st.tabs(["Tabular", "Imágenes"])
 
-if mode == "Entrenar" and data_type == "tabular":
-    st.subheader("Entrenamiento")
-    csv_file = st.file_uploader("Sube CSV de entrenamiento", type="csv")
-    if csv_file is not None:
-        # Read the uploaded CSV into a DataFrame
-        df = pd.read_csv(csv_file)
+# -------------------------------
+# Pestaña: Tabular
+# -------------------------------
+with tab_tabular:
+    st.subheader("Predicción de un registro")
+    st.write("Introduce las medidas de la flor (cm):")
 
-        st.subheader("First 5 Rows")
-        st.dataframe(df.head())   # shows only the first 5 rows
-    epochs = st.slider("Épocas", 1, 100, 20)
-    if csv_file and st.button("Entrenar"):
-        files = {"csv_file": (csv_file.name, csv_file.getvalue(), "text/csv")}
-        data = {"framework": framework, "data_type": data_type, "epochs": str(epochs)}
-        with st.spinner("Entrenando el modelo..."):
-            res = requests.post(f"{FASTAPI_URL}/train/", files=files, data=data)
+    framework = st.selectbox(
+        "Framework", ["tensorflow", "pytorch"], key="framework_tabular"
+    )
+
+    col1, col2 = st.columns(2)
+    with col1:
+        sepal_length = st.number_input(
+            "Largo del sépalo (cm)", min_value=0.0, value=5.1, step=0.1
+        )
+        sepal_width = st.number_input(
+            "Ancho del sépalo (cm)", min_value=0.0, value=3.5, step=0.1
+        )
+    with col2:
+        petal_length = st.number_input(
+            "Largo del pétalo (cm)", min_value=0.0, value=1.4, step=0.1
+        )
+        petal_width = st.number_input(
+            "Ancho del pétalo (cm)", min_value=0.0, value=0.2, step=0.1
+        )
+
+    if st.button("Predecir", key="predecir_tabular"):
+        data = {
+            "data_type": "tabular",
+            "framework": framework,
+            "sepal_length": str(sepal_length),
+            "sepal_width": str(sepal_width),
+            "petal_length": str(petal_length),
+            "petal_width": str(petal_width),
+        }
+
+        res = requests.post(f"{FASTAPI_URL}/predict/", data=data)
+
         st.write("Status:", res.status_code)
         st.write("Raw response:", res.text)
 
-        st.write(res.json())
+        if res.ok:
+            payload = res.json()
+            prediction = payload.get("prediction", [None])[0]
+            species = ["Iris setosa", "Iris versicolor", "Iris virginica"]
+            label = (
+                species[prediction]
+                if isinstance(prediction, int) and 0 <= prediction < len(species)
+                else prediction
+            )
+            st.success(f"Predicción: {label} (clase {prediction})")
+            st.json(payload)
+        else:
+            st.error("Error en la predicción")
 
-elif mode == "Predecir":
-    if data_type == "tabular":
-        st.subheader("Predicción")
-        csv_file = st.file_uploader("Sube CSV a predecir", type="csv")
-        if csv_file is not None:
-            # Read the uploaded CSV into a DataFrame
-            df = pd.read_csv(csv_file)
+# -------------------------------
+# Pestaña: Imágenes
+# -------------------------------
+with tab_imagen:
+    st.subheader("Predicción de imágenes")
 
-            st.subheader("First 5 Rows")
-            st.dataframe(df.head())   # shows only the first 5 rows
-        
-        if csv_file and st.button("Predecir"):
-            # OJO: para FastAPI mandamos multipart/form-data con 'files'
-            files = {
-                "csv_file": (csv_file.name, csv_file.getvalue(), "text/csv")
-            }
-            data = {
-                "data_type": "tabular",
-                "framework": framework,  # el que hayas seleccionado en tu UI
-            }
+    framework = st.selectbox(
+        "Framework", ["tensorflow", "pytorch"], key="framework_imagen"
+    )
 
-            # Ahora sí: enviar archivo + form-data a FastAPI
-            res = requests.post(f"{FASTAPI_URL}/predict/", data=data, files=files)
+    file = st.file_uploader("Sube imagen", type=["png", "jpg", "jpeg"])
+    if file is not None:
+        st.image(file, caption="Imagen subida", use_container_width=True)
 
-            st.write("Status:", res.status_code)
-            st.write("Raw response:", res.text)
-
-            if res.ok:
-                st.success("Predicción:")
-                st.json(res.json())
-            else:
-                st.error("Error en la predicción")
-    else:
-        file = st.file_uploader("Sube archivo", type=["png","jpg","wav","mp3"])
-        if file and st.button("Predecir"):
-            data = {"data_type": data_type, "framework": framework}
-            files = {"file": (file.name, file.getvalue())}
+    if file and st.button("Predecir", key="predecir_imagen"):
+        data = {"data_type": "image", "framework": framework}
+        files = {"file": (file.name, file.getvalue())}
+        with st.spinner("Prediciendo..."):
             r = requests.post(f"{FASTAPI_URL}/predict/", data=data, files=files)
-            st.write(r.json())
+        st.write("Status:", r.status_code)
+        st.write("Raw response:", r.text)
+        if r.ok:
+            st.json(r.json())
+        else:
+            st.error("Error en la predicción")

@@ -1,0 +1,863 @@
+% ============================================================
+%  Presentación del proyecto NNapp
+%  Red Neuronal para clasificación de cáncer de mama
+%  (Breast Cancer Wisconsin)
+%  Dirigida a estudiantes de Sistemas sin experiencia en ML/IA
+%  Compilar con: pdflatex presentacion.tex
+% ============================================================
+
+\documentclass[10pt,aspectratio=169]{beamer}
+
+% --- Idioma y codificación ---
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage[T1]{fontenc}
+
+% --- Paquetes ---
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,calc}
+
+% --- Tema ---
+\usetheme{Madrid}
+\usecolortheme{seahorse}
+\setbeamertemplate{navigation symbols}{}
+
+% --- Colores personalizados ---
+\definecolor{azul}{RGB}{0,90,160}
+\definecolor{verde}{RGB}{0,140,90}
+\definecolor{naranja}{RGB}{230,120,20}
+\definecolor{rojo}{RGB}{200,40,40}
+\setbeamercolor{title}{fg=azul}
+\setbeamercolor{frametitle}{bg=azul,fg=white}
+\setbeamercolor{block title}{bg=azul,fg=white}
+\setbeamercolor{block body}{bg=azul!10}
+
+% --- Configuración de listings para código ---
+\lstset{
+  language=Python,
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\color{azul}\bfseries,
+  commentstyle=\color{verde},
+  stringstyle=\color{naranja},
+  showstringspaces=false,
+  frame=single,
+  breaklines=true,
+  aboveskip=3pt,
+  belowskip=3pt
+}
+
+\title{Red Neuronal para Detección de Cáncer de Mama}
+\subtitle{Proyecto NNapp: Clasificación con TensorFlow y PyTorch}
+\author{Alexandra La Cruz}
+\date{\today}
+\institute{Ingeniería de Sistemas}
+
+% ============================================================
+%  INICIO DEL DOCUMENTO
+% ============================================================
+\begin{document}
+
+% ================= PORTADA =================
+\begin{frame}
+  \titlepage
+\end{frame}
+
+% ================= AGENDA =================
+\begin{frame}{Agenda de la presentación}
+  \tableofcontents
+\end{frame}
+
+% ============================================================
+%  SECCIÓN 1: CONTEXTO Y MOTIVACIÓN
+% ============================================================
+\section{Contexto y Motivación}
+
+\begin{frame}{¿Cuál es el problema?}
+  \begin{block}{Situación real}
+    El \textbf{cáncer de mama} es una de las enfermedades más comunes.
+    Los médicos analizan muestras de tejido (biopsias) para saber si un
+    tumor es \textbf{benigno} (no peligroso) o \textbf{maligno} (peligroso).
+  \end{block}
+
+  \pause
+
+  \begin{alertblock}{El reto}
+    Analizar cada muestra a mano es lento, costoso y puede tener errores.
+    \textbf{¿Podemos hacer que una computadora ayude a clasificar
+    automáticamente cada muestra?}
+  \end{alertblock}
+
+  \pause
+
+  \begin{exampleblock}{Nuestra solución}
+    Construir una \textbf{Red Neuronal} que, a partir de 30 mediciones
+    de una muestra, diga si el tumor es benigno o maligno.
+  \end{exampleblock}
+\end{frame}
+
+\begin{frame}{Objetivos del proyecto}
+  \begin{itemize}
+    \item Entender \textbf{qué es una red neuronal} y cómo aprende.
+    \item Crear una \textbf{aplicación web} completa que:
+      \begin{itemize}
+        \item Entrene un modelo desde un archivo CSV.
+        \item Haga predicciones sobre datos nuevos.
+      \end{itemize}
+    \item Comparar dos \textbf{frameworks} de Inteligencia Artificial:
+      \textbf{TensorFlow} y \textbf{PyTorch}.
+    \item Poner en práctica conceptos de Ingeniería de Sistemas:
+      backend, frontend, API y arquitectura de software.
+  \end{itemize}
+\end{frame}
+
+% ============================================================
+%  SECCIÓN 2: CONCEPTOS BÁSICOS
+% ============================================================
+\section{Conceptos Básicos de IA}
+
+\begin{frame}{Inteligencia Artificial, Machine Learning y Deep Learning}
+  \begin{center}
+    \begin{tikzpicture}[
+        node distance=0.6cm,
+        caja/.style={draw, rounded corners, align=center, minimum height=1.1cm, minimum width=2.2cm},
+        flecha/.style={-{Stealth}, thick, azul}
+      ]
+      \node[caja, fill=azul!15] (ia) {Inteligencia\\Artificial};
+      \node[caja, fill=azul!30, below=of ia] (ml) {Machine\\Learning};
+      \node[caja, fill=azul!45, below=of ml] (dl) {Deep\\Learning};
+      \node[caja, fill=azul!60, below=of dl] (rn) {Redes\\Neuronales};
+
+      \node[right=of ia, align=left, text width=8cm] (iaTxt) {
+        \textbf{IA:} programas que imitan tareas humanas.
+      };
+      \node[right=of ml, align=left, text width=8cm] (mlTxt) {
+        \textbf{ML:} la máquina \textit{aprende} reglas a partir de datos,
+        en vez de programarlas a mano.
+      };
+      \node[right=of dl, align=left, text width=8cm] (dlTxt) {
+        \textbf{DL:} ML con redes de muchas capas.
+      };
+      \node[right=of rn, align=left, text width=8cm] (rnTxt) {
+        \textbf{RN:} modelo inspirado en las neuronas del cerebro.
+      };
+
+      \draw[flecha] (ia) -- (ml);
+      \draw[flecha] (ml) -- (dl);
+      \draw[flecha] (dl) -- (rn);
+    \end{tikzpicture}
+  \end{center}
+  \pause
+  \begin{center}
+    \small Este proyecto usa \textbf{Deep Learning} (redes neuronales con varias capas).
+  \end{center}
+\end{frame}
+
+\begin{frame}{¿Qué es una neurona artificial?}
+  \begin{columns}
+    \column{0.5\textwidth}
+    \begin{itemize}
+      \item Recibe varias \textbf{entradas} ($x_1, x_2, \dots$).
+      \item Cada entrada tiene un \textbf{peso} ($w$) que indica su importancia.
+      \item Suma todo y le aplica una \textbf{función de activación}.
+      \item Produce una \textbf{salida} ($y$).
+    \end{itemize}
+
+    \column{0.5\textwidth}
+    \begin{center}
+      \begin{tikzpicture}[
+          neurona/.style={circle, draw, fill=azul!20, minimum size=0.9cm},
+          entrada/.style={circle, draw, fill=verde!20, minimum size=0.5cm}
+        ]
+        \node[entrada] (x1) at (0,2) {$x_1$};
+        \node[entrada] (x2) at (0,1) {$x_2$};
+        \node[entrada] (x3) at (0,0) {$x_3$};
+        \node[neurona] (n) at (3.5,1) {$\sum$ + act};
+        \node[circle, draw, fill=naranja!20, minimum size=0.5cm] (y) at (6.5,1) {$y$};
+
+        \draw[-{Stealth}] (x1) -- node[above,font=\tiny]{$w_1$} (n);
+        \draw[-{Stealth}] (x2) -- node[above,font=\tiny]{$w_2$} (n);
+        \draw[-{Stealth}] (x3) -- node[above,font=\tiny]{$w_3$} (n);
+        \draw[-{Stealth}] (n) -- (y);
+      \end{tikzpicture}
+    \end{center}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{¿Qué es una red neuronal?}
+  \begin{itemize}
+    \item Muchas neuronas conectadas en \textbf{capas}.
+  \end{itemize}
+  \begin{center}
+    \begin{tikzpicture}[
+        capa/.style={circle, draw, fill=azul!20, minimum size=0.55cm},
+        flecha/.style={-{Stealth}, thin, gray}
+      ]
+      % Capa de entrada
+      \foreach \i in {1,...,4}
+        \node[capa] (in\i) at (0, {2.2 - \i*0.9}) {};
+      % Capa oculta
+      \foreach \i in {1,...,5}
+        \node[capa] (h\i) at (3, {2.6 - \i*0.9}) {};
+      % Capa de salida
+      \foreach \i in {1,...,2}
+        \node[capa, fill=verde!20] (out\i) at (6, {1.8 - \i*0.9}) {};
+
+      \foreach \i in {1,...,4}
+        \foreach \j in {1,...,5}
+          \draw[flecha] (in\i) -- (h\j);
+      \foreach \i in {1,...,5}
+        \foreach \j in {1,...,2}
+          \draw[flecha] (h\i) -- (out\j);
+
+      \node[below=0.3cm of in4, font=\small] {Entrada};
+      \node[below=0.3cm of h5, font=\small] {Capas ocultas};
+      \node[below=0.3cm of out2, font=\small] {Salida};
+    \end{tikzpicture}
+  \end{center}
+  \pause
+  \begin{itemize}
+    \item Los datos entran por la izquierda y fluyen hacia la derecha.
+    \item ``Aprender'' significa \textbf{ajustar los pesos} para acertar.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Clasificación binaria (lo que hacemos aquí)}
+  \begin{block}{¿Qué es clasificar?}
+    Asignar una \textbf{categoría} (clase) a cada dato de entrada.
+  \end{block}
+
+  \pause
+
+  En este proyecto hay solo \textbf{dos categorías posibles}:
+  \begin{center}
+    \begin{tabular}{cc}
+      \toprule
+      \textbf{Clase} & \textbf{Significado} \\
+      \midrule
+      \textcolor{rojo}{\textbf{0}} & Maligno (tumor peligroso) \\
+      \textcolor{verde}{\textbf{1}} & Benigno (tumor no peligroso) \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+
+  \pause
+
+  \begin{exampleblock}{Ejemplo}
+    Entrada: 30 mediciones de una biopsia $\rightarrow$ Salida: probabilidad
+    de ser maligno. Si pasa de 50\,\%, se clasifica como maligno.
+  \end{exampleblock}
+\end{frame}
+
+% ============================================================
+%  SECCIÓN 3: EL DATASET
+% ============================================================
+\section{El Dataset}
+
+\begin{frame}{Dataset: Breast Cancer Wisconsin}
+  \begin{itemize}
+    \item Conjunto de datos real y público, incluido en \textbf{Scikit-Learn}.
+    \item Describe características de biopsias de tumores de mama.
+  \end{itemize}
+
+  \begin{center}
+    \begin{tabular}{ll}
+      \toprule
+      \textbf{Propiedad} & \textbf{Valor} \\
+      \midrule
+      Total de registros & 569 \\
+      Variables de entrada & 30 \\
+      Variable objetivo & \texttt{target} \\
+      Tipo de problema & Clasificación binaria \\
+      Clases & 0 = maligno, 1 = benigno \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+
+  \pause
+  \begin{block}{¿Qué son las 30 variables?}
+    Mediciones numéricas del tumor: radio, textura, perímetro, área,
+    simetría, etc. Cada una describe un aspecto de la célula.
+  \end{block}
+\end{frame}
+
+\begin{frame}{¿Cómo se organizan los datos? (CSV)}
+  \begin{itemize}
+    \item Los datos se guardan en un archivo \textbf{CSV} (texto con columnas).
+    \item Cada \textbf{fila} = una muestra (una paciente/biopsia).
+    \item Cada \textbf{columna} = una característica (feature).
+  \end{itemize}
+
+  \begin{center}
+    \begin{tabular}{ccccc}
+      \toprule
+      \texttt{mean radius} & \texttt{mean texture} & $\dots$ & \texttt{mean area} & \texttt{target} \\
+      \midrule
+      17.99 & 10.38 & $\dots$ & 1001.0 & 0 \\
+      20.57 & 17.77 & $\dots$ & 1326.0 & 0 \\
+      13.54 & 14.36 & $\dots$ & 545.8 & 1 \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+
+  \pause
+  \begin{itemize}
+    \item Las columnas de la izquierda son las \textbf{entradas} (X).
+    \item La columna \texttt{target} es la \textbf{respuesta correcta} (y).
+  \end{itemize}
+\end{frame}
+
+% ============================================================
+%  SECCIÓN 4: ARQUITECTURA DE LA RED
+% ============================================================
+\section{Arquitectura de la Red}
+
+\begin{frame}{Arquitectura de nuestra red neuronal}
+  \begin{center}
+    \begin{tikzpicture}[
+        capa/.style={rectangle, rounded corners, draw, fill=azul!15,
+                     align=center, minimum width=3.2cm, minimum height=1.1cm},
+        flecha/.style={-{Stealth}, thick, azul}
+      ]
+      \node[capa] (e) {Entrada\\30 características};
+      \node[capa, below=of e] (c1) {Dense(64) + ReLU};
+      \node[capa, below=of c1] (c2) {Dense(32) + ReLU};
+      \node[capa, below=of c2] (c3) {Dense(16) + ReLU};
+      \node[capa, fill=verde!20, below=of c3] (s) {Dense(1) + Sigmoid\\\small Salida: 0 ó 1};
+
+      \draw[flecha] (e) -- (c1);
+      \draw[flecha] (c1) -- (c2);
+      \draw[flecha] (c2) -- (c3);
+      \draw[flecha] (c3) -- (s);
+    \end{tikzpicture}
+  \end{center}
+
+  \pause
+  \begin{itemize}
+    \item \textbf{Dense(64)}: capa con 64 neuronas, todas conectadas a la anterior.
+    \item El número baja (64 $\rightarrow$ 32 $\rightarrow$ 16): la red
+          \textbf{resume} la información poco a poco.
+    \item La última capa tiene \textbf{1 neurona} porque hay 2 clases (con sigmoid).
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Funciones de activación}
+  \begin{columns}
+    \column{0.5\textwidth}
+    \begin{block}{ReLU (capas ocultas)}
+      \[
+        f(x) = \max(0, x)
+      \]
+      \begin{itemize}
+        \item Si el valor es negativo $\rightarrow$ 0.
+        \item Si es positivo $\rightarrow$ lo deja pasar.
+        \item Ayuda a la red a aprender patrones no lineales.
+      \end{itemize}
+    \end{block}
+
+    \column{0.5\textwidth}
+    \begin{block}{Sigmoid (capa de salida)}
+      \[
+        f(x) = \frac{1}{1 + e^{-x}}
+      \]
+      \begin{itemize}
+        \item Convierte cualquier número a un valor entre 0 y 1.
+        \item Ese valor se interpreta como \textbf{probabilidad}.
+        \item $>0.5$ $\rightarrow$ benigno, $\leq0.5$ $\rightarrow$ maligno.
+      \end{itemize}
+    \end{block}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Función de pérdida y optimizador}
+  \begin{columns}
+    \column{0.5\textwidth}
+    \begin{block}{Función de pérdida (loss)}
+      \textbf{Binary Cross-Entropy}
+      \begin{itemize}
+        \item Mide \textbf{qué tan mal} predice el modelo.
+        \item Compara la predicción con la respuesta real.
+        \item Meta: que la pérdida sea \textbf{lo más baja posible}.
+      \end{itemize}
+    \end{block}
+
+    \column{0.5\textwidth}
+    \begin{block}{Optimizador: Adam}
+      \begin{itemize}
+        \item Es el ``motor'' que \textbf{ajusta los pesos}.
+        \item Usa la pérdida para saber en qué dirección mejorar.
+        \item Adam es rápido y muy usado en la práctica.
+      \end{itemize}
+    \end{block}
+  \end{columns}
+
+  \pause
+  \begin{center}
+    \small \textbf{Analogía:} la pérdida es la ``nota del examen'' y el
+    optimizador es el ``estudio'' que te hace mejorar en el siguiente intento.
+  \end{center}
+\end{frame}
+
+\begin{frame}{¿Cómo aprende la red? (Entrenamiento)}
+  \begin{enumerate}
+    \item \textbf{Adelante (forward):} los datos pasan por la red y sale una predicción.
+    \item \textbf{Calcular pérdida:} comparar predicción vs. respuesta real.
+    \item \textbf{Atrás (backward):} calcular cómo ajustar cada peso.
+    \item \textbf{Actualizar:} el optimizador modifica los pesos.
+    \item \textbf{Repetir} muchas veces (épocas).
+  \end{enumerate}
+
+  \pause
+  \begin{block}{Épocas (\texttt{epochs})}
+    Una \textbf{época} = ver \textbf{todas} las muestras una vez.
+    Entrenamos 20 épocas: la red revisa el dataset completo 20 veces.
+  \end{block}
+\end{frame}
+
+\begin{frame}{Dividir los datos: entrenar y probar}
+  \begin{itemize}
+    \item No podemos evaluar con los mismos datos de entrenamiento (haría ``trampa'').
+    \item Dividimos el dataset:
+  \end{itemize}
+  \begin{center}
+    \begin{tabular}{ccc}
+      \toprule
+      \textbf{Conjunto} & \textbf{Porcentaje} & \textbf{Uso} \\
+      \midrule
+      Entrenamiento & 80\,\% & Aprender los pesos \\
+      Prueba (test) & 20\,\% & Medir qué tan bien generaliza \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \pause
+  \begin{exampleblock}{¿Por qué es importante?}
+    Queremos que la red aprenda \textbf{patrones}, no que memorice.
+    Si acierta en datos que nunca vio, entonces aprendió de verdad.
+  \end{exampleblock}
+\end{frame}
+
+% ============================================================
+%  SECCIÓN 5: TECNOLOGÍAS
+% ============================================================
+\section{Tecnologías Usadas}
+
+\begin{frame}{TensorFlow vs. PyTorch}
+  \begin{columns}
+    \column{0.5\textwidth}
+    \begin{block}{TensorFlow (Keras)}
+      \begin{itemize}
+        \item De Google.
+        \item API \textbf{Keras}: simple y de alto nivel.
+        \item Ideal para prototipos rápidos.
+        \item Compila el modelo con \texttt{.compile()} y \texttt{.fit()}.
+      \end{itemize}
+    \end{block}
+
+    \column{0.5\textwidth}
+    \begin{block}{PyTorch}
+      \begin{itemize}
+        \item De Meta (Facebook).
+        \item Estilo más ``Python'' y flexible.
+        \item Tú controlas el bucle de entrenamiento.
+        \item Muy usado en investigación.
+      \end{itemize}
+    \end{block}
+  \end{columns}
+
+  \pause
+  \begin{center}
+    \small Ambos hacen lo mismo, pero con distinta forma de escribir el código.
+    Nuestro proyecto soporta los dos.
+  \end{center}
+\end{frame}
+
+\begin{frame}{El stack completo del proyecto}
+  \begin{center}
+    \begin{tikzpicture}[
+        capa/.style={rectangle, rounded corners, draw, fill=azul!15,
+                     align=center, minimum width=6cm, minimum height=1cm},
+        flecha/.style={-{Stealth}, thick, azul}
+      ]
+      \node[capa] (front) {Frontend: \textbf{Streamlit} (interfaz web)};
+      \node[capa, below=of front] (api) {Backend: \textbf{FastAPI} (servidor / API)};
+      \node[capa, below=of api] (ia) {IA: \textbf{TensorFlow} y \textbf{PyTorch}};
+      \node[capa, fill=verde!20, below=of ia] (datos) {Datos: \textbf{Pandas}, \textbf{NumPy}, \textbf{Scikit-Learn}};
+
+      \draw[flecha] (front) -- (api);
+      \draw[flecha] (api) -- (ia);
+      \draw[flecha] (ia) -- (datos);
+    \end{tikzpicture}
+  \end{center}
+
+  \pause
+  \begin{itemize}
+    \item \textbf{Streamlit:} botones y formularios que ve el usuario.
+    \item \textbf{FastAPI:} recibe peticiones HTTP y ejecuta el modelo.
+    \item \textbf{IA:} entrena y predice.
+    \item \textbf{Datos:} carga y limpia los CSV.
+  \end{itemize}
+\end{frame}
+
+% ============================================================
+%  SECCIÓN 5.5: API REST, FASTAPI Y STREAMLIT
+% ============================================================
+\section{API REST, FastAPI y Streamlit}
+
+\begin{frame}{¿Qué es una API?}
+  \begin{block}{Definición}
+    \textbf{API} = \textit{Application Programming Interface} (Interfaz de
+    Programación de Aplicaciones). Es un \textbf{contrato} que permite que dos
+    programas se comuniquen entre sí.
+  \end{block}
+
+  \pause
+
+  \begin{columns}
+    \column{0.48\textwidth}
+    \begin{exampleblock}{Analogía: el mesero}
+      Tú (cliente) pides un plato al \textbf{mesero} (API). El mesero lleva el
+      pedido a la \textbf{cocina} (servidor) y te trae la comida (respuesta).
+      No necesitas entrar a la cocina.
+    \end{exampleblock}
+
+    \column{0.48\textwidth}
+    \begin{block}{En nuestro proyecto}
+      El \textbf{frontend} (Streamlit) y el \textbf{backend} (FastAPI) son
+      programas distintos que se comunican a través de una API.
+    \end{block}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{¿Qué es una API REST?}
+  \begin{block}{REST}
+    \textbf{REST} = \textit{Representational State Transfer}. Es un
+    \textbf{estilo de arquitectura} para diseñar APIs web.
+  \end{block}
+
+  \pause
+
+  \begin{itemize}
+    \item Se comunica usando \textbf{HTTP} (el mismo protocolo de las páginas web).
+    \item Usa los \textbf{métodos HTTP} para indicar la acción:
+      \begin{itemize}
+        \item \texttt{GET}: leer información.
+        \item \texttt{POST}: crear / enviar datos.
+        \item \texttt{PUT}: actualizar.
+        \item \texttt{DELETE}: borrar.
+      \end{itemize}
+    \item Los datos viajan normalmente en formato \textbf{JSON}.
+  \end{itemize}
+
+  \pause
+  \begin{center}
+    \small Nuestra app usa \texttt{POST} porque enviamos archivos CSV al servidor.
+  \end{center}
+\end{frame}
+
+\begin{frame}{¿Qué es un endpoint?}
+  \begin{block}{Definición}
+    Un \textbf{endpoint} es una \textbf{URL específica} que expone una
+    funcionalidad del backend. Cada endpoint hace \textbf{una tarea}.
+  \end{block}
+
+  \pause
+
+  \begin{center}
+    \begin{tabular}{lll}
+      \toprule
+      \textbf{Método} & \textbf{Endpoint} & \textbf{Qué hace} \\
+      \midrule
+      \texttt{POST} & \texttt{/train} & Entrena el modelo con un CSV \\
+      \texttt{POST} & \texttt{/predict/} & Predice sobre datos nuevos \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+
+  \pause
+
+  \begin{exampleblock}{Ejemplo}
+    \texttt{http://localhost:8000/train} $\rightarrow$ sube el CSV y entrena. \\
+    \texttt{http://localhost:8000/predict/} $\rightarrow$ sube datos y predice.
+  \end{exampleblock}
+\end{frame}
+
+\begin{frame}{FastAPI: el backend}
+  \begin{block}{¿Qué es FastAPI?}
+    Es un \textbf{framework de Python} para crear APIs web de forma rápida y
+    moderna. Es el encargado de nuestro \textbf{backend}.
+  \end{block}
+
+  \pause
+
+  \begin{itemize}
+    \item Muy \textbf{rápido} (basado en estándares como ASGI y Uvicorn).
+    \item \textbf{Documentación automática} e interactiva (Swagger UI en \texttt{/docs}).
+    \item \textbf{Validación de datos} con \textit{Pydantic} (tipos de Python).
+    \item Define endpoints con decoradores como \texttt{@app.post("/train")}.
+  \end{itemize}
+
+  \pause
+  \begin{center}
+    \small Con FastAPI recibimos el CSV, lo preprocesamos, entrenamos el modelo
+    y devolvemos el resultado en JSON.
+  \end{center}
+\end{frame}
+
+\begin{frame}{Streamlit: el frontend}
+  \begin{block}{¿Qué es Streamlit?}
+    Es un \textbf{framework de Python} para construir \textbf{interfaces web}
+    de datos y de machine learning \textbf{sin escribir HTML, CSS ni JavaScript}.
+  \end{block}
+
+  \pause
+
+  \begin{itemize}
+    \item Todo se escribe en \textbf{Python} con funciones simples.
+    \item Crea \textbf{widgets} en una línea: botones, selectores, subida de archivos.
+    \item Ideal para \textbf{dashboards}, demos y prototipos de IA.
+    \item Se ejecuta con: \texttt{streamlit run ui/app.py}.
+  \end{itemize}
+
+  \pause
+  \begin{exampleblock}{En nuestra app}
+    Streamlit muestra los botones y formularios, y cuando el usuario presiona
+    ``Entrenar'' o ``Predecir'', llama a FastAPI vía HTTP usando la librería
+    \texttt{requests}.
+  \end{exampleblock}
+\end{frame}
+
+% ============================================================
+%  SECCIÓN 6: CÓMO FUNCIONA
+% ============================================================
+\section{Cómo Funciona la Aplicación}
+
+\begin{frame}{Estructura del proyecto (carpetas)}
+  \begin{center}
+    \begin{tabular}{ll}
+      \toprule
+      \textbf{Parte} & \textbf{Carpeta y contenido} \\
+      \midrule
+      \textbf{Backend} & \texttt{app/} $\rightarrow$ servidor FastAPI (endpoints) \\
+      \textbf{Frontend} & \texttt{ui/} $\rightarrow$ interfaz Streamlit \\
+      \textbf{FastAPI} & define \texttt{/train} y \texttt{/predict/} en \texttt{app/main.py} \\
+      \textbf{Streamlit} & formularios y botones en \texttt{ui/app.py} \\
+      \texttt{models/} & Redes neuronales y entrenadores (TF y PyTorch) \\
+      \texttt{utils/} & Carga y preprocesamiento de datos \\
+      \texttt{datasets/} & Archivos CSV de datos \\
+      \texttt{uploads/} & Archivos subidos por el usuario \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+
+  \pause
+  \begin{block}{Separation of concerns}
+    Cada carpeta tiene una responsabilidad clara: es más fácil de mantener,
+    probar y entender. Es una buena práctica de ingeniería de software.
+  \end{block}
+\end{frame}
+
+\begin{frame}{Flujo de entrenamiento}
+  \begin{enumerate}
+    \item El usuario sube un CSV en la interfaz (Streamlit).
+    \item Streamlit envía el archivo al backend (FastAPI) vía HTTP.
+    \item FastAPI guarda el archivo y lo preprocesa:
+      \begin{itemize}
+        \item Separa X (características) y y (target).
+        \item Divide en entrenamiento (80\,\%) y prueba (20\,\%).
+        \item Normaliza los datos (\texttt{StandardScaler}).
+      \end{itemize}
+    \item Entrena la red (TensorFlow o PyTorch).
+    \item Guarda el modelo entrenado en disco.
+    \item Devuelve la ruta del modelo guardado.
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}{Preprocesamiento de datos}
+  \begin{block}{¿Por qué normalizar?}
+    Las variables tienen escalas muy diferentes (ej. radio = 17, área = 1000).
+    Si una variable tiene números enormes, ``domina'' el aprendizaje.
+  \end{block}
+
+  \pause
+  \begin{block}{StandardScaler}
+    Transforma cada columna para que tenga \textbf{media 0} y \textbf{desviación 1}:
+    \[
+      z = \frac{x - \text{media}}{\text{desviación}}
+    \]
+    Así todas las variables tienen la misma importancia al empezar.
+  \end{block}
+\end{frame}
+
+\begin{frame}{Flujo de predicción}
+  \begin{enumerate}
+    \item El usuario sube un CSV \textbf{sin} la columna target.
+    \item FastAPI preprocesa los datos (mismo proceso que en entrenamiento).
+    \item Carga el modelo ya entrenado.
+    \item El modelo genera una \textbf{probabilidad} para cada fila.
+    \item Se convierte a clase: $>0.5 \rightarrow 1$ (benigno), si no $\rightarrow 0$ (maligno).
+    \item Se devuelve la lista de predicciones.
+  \end{enumerate}
+
+  \pause
+  \begin{exampleblock}{Importante}
+    Los datos de predicción deben pasar por el \textbf{mismo} preprocesamiento
+    que los de entrenamiento, o el modelo fallará.
+  \end{exampleblock}
+\end{frame}
+
+\begin{frame}[fragile]{El backend: FastAPI (endpoints)}
+  \lstset{language=Python,basicstyle=\ttfamily\tiny}
+  \begin{lstlisting}
+@app.post("/train")
+async def train_model(csv_file: UploadFile, framework: str = Form(...),
+                      epochs: int = Form(20), target_column: str = Form(...)):
+    # guarda el CSV, preprocesa y entrena
+    X_train, y_train, X_test, y_test = prepare_tabular_data(temp_path,
+                                             target_column=target_column)
+    if framework.lower() == "pytorch":
+        model_path = trainer_pt.train_tabular(X_train, y_train, X_test, y_test, epochs)
+    else:
+        model_path = trainer_tf.train_tabular(X_train, y_train, X_test, y_test, epochs)
+    return {"status": "ok", "saved_model": str(model_path)}
+  \end{lstlisting}
+
+  \pause
+  \begin{itemize}
+    \item \texttt{/train}: entrena con el CSV subido.
+    \item \texttt{/predict/}: predice sobre datos nuevos.
+    \item Soporta \texttt{data\_type}: tabular, imagen y audio.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{La red en código (TensorFlow / Keras)}
+  \lstset{language=Python,basicstyle=\ttfamily\tiny}
+  \begin{lstlisting}
+from tensorflow import keras
+from tensorflow.keras import layers
+
+def build_tabular_model(input_dim=30):
+    model = keras.Sequential([
+        layers.Input(shape=(input_dim,)),
+        layers.Dense(64, activation="relu"),
+        layers.Dense(32, activation="relu"),
+        layers.Dense(16, activation="relu"),
+        layers.Dense(1, activation="sigmoid"),
+    ])
+    model.compile(optimizer="adam",
+                  loss="binary_crossentropy",
+                  metrics=["accuracy"])
+    return model
+  \end{lstlisting}
+  \pause
+  \begin{center}
+    \small Con solo unas líneas ya tenemos la red definida y lista para entrenar.
+  \end{center}
+\end{frame}
+
+\begin{frame}[fragile]{La red en código (PyTorch)}
+  \lstset{language=Python,basicstyle=\ttfamily\tiny}
+  \begin{lstlisting}
+import torch.nn as nn
+
+class TabularNet(nn.Module):
+    def __init__(self, input_dim=30):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(input_dim, 64), nn.ReLU(),
+            nn.Linear(64, 32),      nn.ReLU(),
+            nn.Linear(32, 16),      nn.ReLU(),
+            nn.Linear(16, 1),       nn.Sigmoid(),
+        )
+    def forward(self, x):
+        return self.net(x)
+  \end{lstlisting}
+  \pause
+  \begin{center}
+    \small Misma arquitectura, pero en PyTorch escribimos la clase y el
+    bucle de entrenamiento manualmente.
+  \end{center}
+\end{frame}
+
+% ============================================================
+%  SECCIÓN 7: CÓMO EJECUTAR
+% ============================================================
+\section{Cómo Ejecutarlo}
+
+\begin{frame}[fragile]{Pasos para ejecutar el proyecto}
+  \begin{enumerate}
+    \item Crear y activar un entorno virtual:
+      \lstset{language=bash,basicstyle=\ttfamily\tiny}
+      \begin{lstlisting}
+python -m venv .venv
+.\.venv\Scripts\activate      # Windows
+source .venv/bin/activate     # Linux/Mac
+      \end{lstlisting}
+    \pause
+    \item Instalar dependencias:
+      \begin{lstlisting}
+pip install -r requirements.txt
+      \end{lstlisting}
+    \pause
+    \item Levantar el backend (terminal 1):
+      \begin{lstlisting}
+uvicorn app.main:app --reload --port 8000
+      \end{lstlisting}
+    \pause
+    \item Levantar el frontend (terminal 2):
+      \begin{lstlisting}
+streamlit run ui/app.py
+      \end{lstlisting}
+  \end{enumerate}
+\end{frame}
+
+% ============================================================
+%  SECCIÓN 8: CONCLUSIONES
+% ============================================================
+\section{Conclusiones}
+
+\begin{frame}{Conclusiones}
+  \begin{itemize}
+    \item Construimos una \textbf{red neuronal} que clasifica tumores de mama
+          en benignos o malignos usando 30 características.
+    \item Aprendimos el ciclo completo de un proyecto de IA:
+          \textbf{datos} $\rightarrow$ \textbf{preprocesar} $\rightarrow$
+          \textbf{entrenar} $\rightarrow$ \textbf{predecir}.
+    \item La misma arquitectura se implementó en \textbf{TensorFlow} y
+          \textbf{PyTorch}, mostrando que el concepto es lo importante,
+          no la herramienta.
+    \item Separamos \textbf{backend} (FastAPI) y \textbf{frontend} (Streamlit),
+          una buena práctica de arquitectura de software.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Posibles mejoras futuras}
+  \begin{itemize}
+    \item Probar más arquitecturas y ajustar \textbf{hiperparámetros}
+          (más capas, otras activaciones, learning rate).
+    \item Añadir \textbf{métricas} extra: precisión, recall, F1 y matriz de confusión.
+    \item Entrenar modelos de \textbf{imagen} y \textbf{audio} completos.
+    \item Implementar \textbf{validación cruzada} para resultados más confiables.
+    \item Desplegar la app en la nube (Docker + servidor).
+  \end{itemize}
+\end{frame}
+
+% ================= CIERRE =================
+\begin{frame}{¡Gracias!}
+  \begin{center}
+    {\Large \textbf{¡Gracias por su atención!}}
+
+    \vspace{0.5cm}
+
+    {\large Proyecto: NNapp\\}
+    {\large Red Neuronal para Detección de Cáncer de Mama}
+
+    \vspace{0.5cm}
+
+    \textbf{¿Preguntas?}
+  \end{center}
+\end{frame}
+
+\end{document}

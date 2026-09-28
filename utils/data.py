@@ -1,5 +1,7 @@
 # utils/data.py
 import pandas as pd
+import joblib
+from pathlib import Path
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
@@ -23,6 +25,12 @@ def prepare_tabular_data(csv_path, target_column="target"):
     scaler = StandardScaler()
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
+
+    # Guardar el scaler para reutilizarlo en la predicción de un registro
+    scaler_path = Path("models/saved/tabular_scaler.pkl")
+    scaler_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(scaler, scaler_path)
+
     print(f"prepare_tabular_data: X_train shape {X_train.shape}, y_train shape {y_train.shape}")
     print(f"prepare_tabular_data: X_test shape {X_test.shape}, y_test shape {y_test.shape}")
     

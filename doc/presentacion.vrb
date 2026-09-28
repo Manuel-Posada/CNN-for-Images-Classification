@@ -1,0 +1,25 @@
+\frametitle{Pasos para ejecutar el proyecto}
+\begin{enumerate}
+    \item Crear y activar un entorno virtual:
+      \lstset{language=bash,basicstyle=\ttfamily\tiny}
+      \begin{lstlisting}
+python -m venv .venv
+.\.venv\Scripts\activate      # Windows
+source .venv/bin/activate     # Linux/Mac
+      \end{lstlisting}
+    \pause
+    \item Instalar dependencias:
+      \begin{lstlisting}
+pip install -r requirements.txt
+      \end{lstlisting}
+    \pause
+    \item Levantar el backend (terminal 1):
+      \begin{lstlisting}
+uvicorn app.main:app --reload --port 8000
+      \end{lstlisting}
+    \pause
+    \item Levantar el frontend (terminal 2):
+      \begin{lstlisting}
+streamlit run ui/app.py
+      \end{lstlisting}
+  \end{enumerate}

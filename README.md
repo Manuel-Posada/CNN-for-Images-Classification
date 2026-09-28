@@ -5,11 +5,11 @@
 # Activate the venv in Windows
 > .\.venv\Scripts\activate
 
-# Activate the venv in Linux
+# Activate the venv in Linux o Mac
 > source .venv\bin\activate
 
 # install requirements packages
-> pip intall -r .\requirements.txt
+> pip install -r .\requirements.txt
 
 # Abre un terminal y ejecutas el Backend:
 > uvicorn app.main:app --reload --port 8000
