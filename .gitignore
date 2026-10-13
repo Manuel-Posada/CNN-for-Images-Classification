@@ -13,3 +13,6 @@ output-*/
 uploads/
 uploads-*/
 datasets-*/
+
+# Pesos de modelos (grandes; se mantienen en local, no se versionan)
+models/saved/*.pth

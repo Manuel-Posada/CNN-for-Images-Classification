@@ -1,0 +1,63 @@
+{
+  "classes": [
+    "Bear",
+    "Bird",
+    "Cat",
+    "Cow",
+    "Deer",
+    "Dog",
+    "Dolphin",
+    "Elephant",
+    "Giraffe",
+    "Horse",
+    "Kangaroo",
+    "Lion",
+    "Panda",
+    "Tiger",
+    "Zebra"
+  ],
+  "mean": [
+    0.485,
+    0.456,
+    0.406
+  ],
+  "std": [
+    0.229,
+    0.224,
+    0.225
+  ],
+  "models": {
+    "cnn": {
+      "label": "CNN desde cero (32px)",
+      "weights": "cnn.pth",
+      "img_size": 32,
+      "test_accuracy": 0.6849,
+      "test_balanced_accuracy": 0.6849,
+      "test_macro_f1": 0.6813
+    },
+    "resnet18": {
+      "label": "ResNet18 TL (128px)",
+      "weights": "resnet18.pth",
+      "img_size": 128,
+      "test_accuracy": 0.8322,
+      "test_balanced_accuracy": 0.8309,
+      "test_macro_f1": 0.8332
+    },
+    "alexnet": {
+      "label": "AlexNet TL (128px)",
+      "weights": "alexnet.pth",
+      "img_size": 128,
+      "test_accuracy": 0.8733,
+      "test_balanced_accuracy": 0.872,
+      "test_macro_f1": 0.872
+    },
+    "resnet18_32": {
+      "label": "ResNet18 TL (32px)",
+      "weights": "resnet18_32.pth",
+      "img_size": 32,
+      "test_accuracy": 0.3185,
+      "test_balanced_accuracy": 0.3175,
+      "test_macro_f1": 0.3121
+    }
+  }
+}
