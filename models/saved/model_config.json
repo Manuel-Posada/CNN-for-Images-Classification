@@ -1,0 +1,55 @@
+{
+  "classes": [
+    "Bear",
+    "Bird",
+    "Cat",
+    "Cow",
+    "Deer",
+    "Dog",
+    "Dolphin",
+    "Elephant",
+    "Giraffe",
+    "Horse",
+    "Kangaroo",
+    "Lion",
+    "Panda",
+    "Tiger",
+    "Zebra"
+  ],
+  "mean": [
+    0.485,
+    0.456,
+    0.406
+  ],
+  "std": [
+    0.229,
+    0.224,
+    0.225
+  ],
+  "models": {
+    "cnn": {
+      "label": "CNN desde cero (32px)",
+      "weights": "cnn.pth",
+      "img_size": 32,
+      "test_accuracy": 0.6027,
+      "test_balanced_accuracy": 0.6013,
+      "test_macro_f1": 0.6023
+    },
+    "resnet18": {
+      "label": "ResNet18 TL (128px)",
+      "weights": "resnet18.pth",
+      "img_size": 128,
+      "test_accuracy": 0.839,
+      "test_balanced_accuracy": 0.8382,
+      "test_macro_f1": 0.8408
+    },
+    "alexnet": {
+      "label": "AlexNet TL (128px)",
+      "weights": "alexnet.pth",
+      "img_size": 128,
+      "test_accuracy": 0.8527,
+      "test_balanced_accuracy": 0.8519,
+      "test_macro_f1": 0.8534
+    }
+  }
+}

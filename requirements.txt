@@ -3,22 +3,17 @@ fastapi
 uvicorn[standard]
 streamlit
 
-# --- IA: frameworks principales ---
-tensorflow      # CPU (usa tensorflow-gpu si vas a GPU)
+# --- IA: PyTorch ---
 torch
 torchvision
-torchaudio
 
-# --- Preprocesamiento de datos ---
-pandas
+# --- Preprocesamiento / datos ---
 numpy
-scikit-learn
 
-# --- Imagen y audio ---
-Pillow          # Para manejo de imágenes en Streamlit / PIL
-soundfile      # Lectura de audio en preprocess
-librosa        # Opcional: espectrogramas y features de audio
+# --- Imagen ---
+Pillow
 
 # --- Otros útiles ---
-requests      # Streamlit → FastAPI POST
+requests          # Streamlit -> FastAPI POST
 python-multipart  # Carga de archivos en FastAPI
+matplotlib        # Gráficas de métricas en la UI
