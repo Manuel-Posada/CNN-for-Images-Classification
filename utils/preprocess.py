@@ -1,116 +1,42 @@
+"""Preprocesamiento de imagenes para inferencia.
+
+Reproduce EXACTAMENTE el pipeline de evaluacion del notebook de entrenamiento:
+
+    PIL -> convert('RGB') -> Resize((img_size, img_size)) -> ToTensor -> Normalize(mean, std)
+
+usando `torchvision.transforms`, de modo que las predicciones coincidan con las
+del notebook. `img_size`, `mean` y `std` se leen de `models/saved/model_config.json`
+(a traves de `models.pytorch_models`); no hay valores hardcodeados.
 """
-Funciones de preprocesamiento para datos tabulares, de imagen y de audio.
-Se usan tanto en entrenamiento como en predicción.
-"""
+from __future__ import annotations
+
 import io
-import joblib
-from pathlib import Path
-import numpy as np
-import pandas as pd
-from typing import Tuple
-from sklearn.preprocessing import StandardScaler
+from functools import lru_cache
 
-# Opcionales: solo si planeas usar imágenes/audio
+import torch
 from PIL import Image
-import librosa
+from torchvision import transforms
+
+from models.pytorch_models import get_img_size, get_mean_std
 
 
-# -----------------------------
-# Tabular
-# -----------------------------
-def preprocess_tabular(df: pd.DataFrame, target_column: str = None) -> tuple[np.ndarray, np.ndarray | None]:
-    df = df.copy()
-
-    # Separar y antes de limpiar X
-    y = None
-    if target_column and target_column in df.columns:
-        y = df[target_column].values
-        df = df.drop(columns=[target_column])
-
-    # Limpiar columnas con strings numéricos mal formateados
-    for col in df.columns:
-        if df[col].dtype == object:
-            df[col] = (
-                df[col]
-                .str.replace('.', '', regex=False)  # quitar puntos de miles
-                .str.replace(',', '.', regex=False) # coma decimal a punto
-            )
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-
-    df = df.fillna(0)
-
-    scaler = StandardScaler()
-    X = scaler.fit_transform(df.astype(np.float32))
-
-    return X, y
+@lru_cache(maxsize=None)
+def _build_transform(arch: str) -> transforms.Compose:
+    img_size = get_img_size(arch)
+    mean, std = get_mean_std()
+    return transforms.Compose(
+        [
+            transforms.Resize((img_size, img_size)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean, std),
+        ]
+    )
 
 
-# -----------------------------
-# Tabular - registro único (interfaz de predicción manual)
-# -----------------------------
-# Columnas de entrada del dataset Iris.
-TABULAR_FEATURE_COLUMNS = [
-    "sepal length (cm)",
-    "sepal width (cm)",
-    "petal length (cm)",
-    "petal width (cm)",
-]
+def preprocess_image(file_bytes: bytes, arch: str) -> torch.Tensor:
+    """Convierte los bytes de una imagen en el tensor (C, H, W) que espera `arch`.
 
-SCALER_PATH = Path("models/saved/tabular_scaler.pkl")
-
-
-def _load_or_fit_scaler() -> StandardScaler:
-    """Carga el scaler guardado durante el entrenamiento; si aún no existe,
-    ajusta uno de referencia con el dataset Iris para poder predecir de inmediato."""
-    if SCALER_PATH.exists():
-        return joblib.load(SCALER_PATH)
-
-    ref_csv = Path("datasets/tabular/iris.csv")
-    if ref_csv.exists():
-        df = pd.read_csv(ref_csv)
-        if "target" in df.columns:
-            df = df.drop(columns=["target"])
-        scaler = StandardScaler().fit(df.astype(np.float32))
-    else:
-        scaler = StandardScaler()
-
-    SCALER_PATH.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(scaler, SCALER_PATH)
-    return scaler
-
-
-def preprocess_tabular_record(values: list[float]) -> np.ndarray:
-    """Convierte un único registro (4 medidas de la flor) en la matriz que
-    espera el modelo, aplicando el mismo escalado usado en el entrenamiento."""
-    scaler = _load_or_fit_scaler()
-    df = pd.DataFrame([values], columns=TABULAR_FEATURE_COLUMNS)
-    return scaler.transform(df.astype(np.float32))
-
-
-# -----------------------------
-def preprocess_image(file_bytes: bytes, size: Tuple[int, int] = (128, 128)) -> np.ndarray:
+    Lanza `PIL.UnidentifiedImageError`/`OSError` si los bytes no son una imagen valida.
     """
-    Abre una imagen, la convierte a RGB, la redimensiona y normaliza a [0,1].
-    Retorna un array (H, W, 3).
-    """
-    img = Image.open(io.BytesIO(file_bytes)).convert("RGB")
-    img = img.resize(size)
-    arr = np.array(img).astype("float32") / 255.0
-    return arr
-
-
-# -----------------------------
-# Audio
-# -----------------------------
-def preprocess_audio(file_bytes: bytes, sr: int = 16000) -> np.ndarray:
-    """
-    Carga un archivo de audio en memoria, lo resamplea y extrae un mel-spectrogram.
-    Retorna un array 2D (frecuencias x frames).
-    """
-    # librosa.load acepta un file-like object
-    audio, _ = librosa.load(io.BytesIO(file_bytes), sr=sr, mono=True)
-    mel = librosa.feature.melspectrogram(y=audio, sr=sr, n_mels=64)
-    mel_db = librosa.power_to_db(mel, ref=np.max)
-    # Normalizamos a [0,1]
-    mel_db = (mel_db - mel_db.min()) / (mel_db.max() - mel_db.min() + 1e-8)
-    return mel_db.astype("float32")
+    image = Image.open(io.BytesIO(file_bytes)).convert("RGB")
+    return _build_transform(arch)(image)

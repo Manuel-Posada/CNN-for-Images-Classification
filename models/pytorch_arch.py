@@ -1,73 +1,70 @@
-# app/models/pytorch_arch.py
-"""Arquitecturas PyTorch.
+"""Arquitecturas PyTorch del clasificador de imagenes de animales.
 
-Contrato de salida (equivalente al de `tensorflow_arch.py`, que usa
-`activation="softmax"` en la última capa + `sparse_categorical_crossentropy`):
+Contenido migrado desde `notebooks/model_defs.py` (misma logica, sin cambios)
+para poder reconstruir los checkpoints guardados en `models/saved/*.pth`.
 
-    - TabularNet -> logits de forma (batch, n_classes). NO se aplica ninguna
-      activación final a propósito: `nn.CrossEntropyLoss` espera logits, y
-      `utils.inference.run_inference` ya decide entre sigmoide (1 salida) o
-      argmax (varias salidas) leyendo `preds.shape[1]`.
-    - ImageCNN   -> logits (batch, n_classes), admite cualquier tamaño de
-      entrada (por defecto el 128x128 que produce `utils.preprocess.preprocess_image`).
-    - AudioCNN   -> logits (batch, n_classes), admite espectrogramas de
-      cualquier tamaño (mel-spectrogramas de `utils.preprocess.preprocess_audio`).
+    - CNNBaseline  : CNN desde cero (entrada 32x32).
+    - build_resnet18 / build_alexnet : transfer learning con backbone congelado.
+    - build_model  : factoria por nombre de arquitectura.
+
+Con `pretrained=False` no se descarga nada de internet: solo se instancia la
+topologia para cargar encima el `state_dict` local.
 """
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+from torchvision import models
 
 
-class TabularNet(nn.Module):
-    """MLP para datos tabulares. Valores por defecto acordes al dataset Iris
-    (4 medidas de flor, 3 especies), que es el caso tabular del proyecto."""
-
-    def __init__(self, input_dim: int = 4, n_classes: int = 3):
+class CNNBaseline(nn.Module):
+    def __init__(self, num_classes):
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(input_dim, 32),
-            nn.ReLU(),
-            nn.Linear(32, 16),
-            nn.ReLU(),
-            nn.Linear(16, n_classes),  # logits: sin activación final
-        )
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1);   self.bn1 = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1);  self.bn2 = nn.BatchNorm2d(64)
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1); self.bn3 = nn.BatchNorm2d(128)
+        self.conv4 = nn.Conv2d(128, 256, kernel_size=3, padding=1); self.bn4 = nn.BatchNorm2d(256)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.gap = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc1 = nn.Linear(256, 256)
+        self.bn_fc = nn.BatchNorm1d(256)
+        self.dropout = nn.Dropout(0.5)
+        self.fc2 = nn.Linear(256, num_classes)   # sin softmax: lo incluye CrossEntropyLoss
 
     def forward(self, x):
-        return self.net(x)
+        x = self.pool(F.relu(self.bn1(self.conv1(x))))
+        x = self.pool(F.relu(self.bn2(self.conv2(x))))
+        x = self.pool(F.relu(self.bn3(self.conv3(x))))
+        x = self.pool(F.relu(self.bn4(self.conv4(x))))
+        x = torch.flatten(self.gap(x), 1)
+        x = self.dropout(x)
+        x = F.relu(self.bn_fc(self.fc1(x)))
+        x = self.dropout(x)
+        return self.fc2(x)
 
 
-class ImageCNN(nn.Module):
-    """CNN para imágenes. `AdaptiveAvgPool2d` hace que la cabeza densa no
-    dependa del tamaño de entrada, así la misma arquitectura sirve para 32x32
-    o para el 128x128 que genera el preprocesado."""
-
-    def __init__(self, n_channels: int = 3, n_classes: int = 10):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Conv2d(n_channels, 32, 3, padding=1), nn.ReLU(),
-            nn.MaxPool2d(2, 2),
-            nn.Conv2d(32, 64, 3, padding=1), nn.ReLU(),
-            nn.MaxPool2d(2, 2),
-            nn.AdaptiveAvgPool2d((4, 4)),
-            nn.Flatten(),
-            nn.Linear(64 * 4 * 4, 64), nn.ReLU(),
-            nn.Linear(64, n_classes),  # logits: sin activación final
-        )
-
-    def forward(self, x):
-        return self.net(x)
+def build_resnet18(num_classes, pretrained=True):
+    weights = models.ResNet18_Weights.DEFAULT if pretrained else None
+    m = models.resnet18(weights=weights)
+    for p in m.parameters():
+        p.requires_grad = False                       # congelar backbone
+    m.fc = nn.Sequential(nn.Dropout(0.3), nn.Linear(m.fc.in_features, num_classes))
+    return m
 
 
-class AudioCNN(nn.Module):
-    """CNN para mel-espectrogramas (1 canal)."""
+def build_alexnet(num_classes, pretrained=True):
+    weights = models.AlexNet_Weights.DEFAULT if pretrained else None
+    m = models.alexnet(weights=weights)
+    for p in m.parameters():
+        p.requires_grad = False                       # congelar todo
+    m.classifier[6] = nn.Linear(m.classifier[6].in_features, num_classes)   # nueva capa de salida
+    return m
 
-    def __init__(self, n_classes: int = 35):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Conv2d(1, 32, 3), nn.ReLU(), nn.MaxPool2d(2),
-            nn.Conv2d(32, 64, 3), nn.ReLU(), nn.AdaptiveAvgPool2d((1, 1)),
-            nn.Flatten(),
-            nn.Linear(64, n_classes),  # logits: sin activación final
-        )
 
-    def forward(self, x):
-        return self.net(x)
+def build_model(arch, num_classes, pretrained=True):
+    if arch == 'cnn':
+        return CNNBaseline(num_classes)
+    if arch == 'resnet18':
+        return build_resnet18(num_classes, pretrained)
+    if arch == 'alexnet':
+        return build_alexnet(num_classes, pretrained)
+    raise ValueError(f'Arquitectura desconocida: {arch}')
