@@ -50,6 +50,14 @@
       "test_accuracy": 0.8527,
       "test_balanced_accuracy": 0.8519,
       "test_macro_f1": 0.8534
+    },
+    "resnet18_32": {
+      "label": "ResNet18 TL (32px)",
+      "weights": "resnet18_32.pth",
+      "img_size": 32,
+      "test_accuracy": 0.3185,
+      "test_balanced_accuracy": 0.3175,
+      "test_macro_f1": 0.3121
     }
   }
 }

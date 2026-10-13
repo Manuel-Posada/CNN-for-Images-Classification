@@ -63,7 +63,8 @@ def build_alexnet(num_classes, pretrained=True):
 def build_model(arch, num_classes, pretrained=True):
     if arch == 'cnn':
         return CNNBaseline(num_classes)
-    if arch == 'resnet18':
+    if arch in ('resnet18', 'resnet18_32'):
+        # resnet18_32: misma arquitectura, entrenada con imagenes 32x32
         return build_resnet18(num_classes, pretrained)
     if arch == 'alexnet':
         return build_alexnet(num_classes, pretrained)
