@@ -1,77 +1,90 @@
-from fastapi import FastAPI, UploadFile, File, Form
-from utils.inference import run_inference
-from utils.preprocess import preprocess_tabular, preprocess_tabular_record, preprocess_image, preprocess_audio
-from pathlib import Path
-from utils.data import load_and_split, prepare_tabular_data
-from models import trainer_tf, trainer_pt
-import pandas as pd
-from io import StringIO
-app = FastAPI()
+"""API FastAPI del clasificador de imagenes de animales (PyTorch).
+
+Endpoints:
+    GET  /models                 -> resumen de los modelos disponibles
+    GET  /models/{arch}/metrics  -> metricas completas de un modelo
+    POST /predict/               -> inferencia sobre una imagen subida
+
+Las metricas se LEEN de `models/saved/metrics.json`; nunca se recalculan.
+"""
+from __future__ import annotations
 
 import logging
+
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from PIL import UnidentifiedImageError
+
+from models.pytorch_models import available_archs, get_img_size, load_config, load_metrics
+from utils.inference import run_inference
+from utils.preprocess import preprocess_image
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# En lugar de print():
+app = FastAPI(title="Clasificador de animales (PyTorch)")
+
+
+@app.get("/models")
+def list_models() -> list[dict]:
+    """Resumen de cada arquitectura y sus metricas de test."""
+    config = load_config()
+    return [
+        {
+            "arch": arch,
+            "label": entry["label"],
+            "img_size": entry["img_size"],
+            "test_accuracy": entry.get("test_accuracy"),
+            "test_balanced_accuracy": entry.get("test_balanced_accuracy"),
+            "test_macro_f1": entry.get("test_macro_f1"),
+        }
+        for arch, entry in config["models"].items()
+    ]
+
+
+@app.get("/models/{arch}/metrics")
+def model_metrics(arch: str) -> dict:
+    """Metricas completas (metrics.json) del modelo `arch`, con classes y split_sizes."""
+    metrics = load_metrics()
+    section = metrics["models"].get(arch)
+    if section is None:
+        raise HTTPException(status_code=404, detail=f"Modelo no encontrado: '{arch}'")
+
+    return {
+        "arch": arch,
+        "classes": metrics["classes"],
+        "split_sizes": metrics["split_sizes"],
+        **section,
+    }
+
 
 @app.post("/predict/")
 async def predict(
-    data_type: str = Form(...),          # 'tabular' | 'image' | 'audio'
-    framework: str = Form(...),          # 'tensorflow' | 'pytorch'
-    csv_file: UploadFile = File(None),  # CSV para datos tabulares (opcional)
-    file: UploadFile = File(None),      # Imagen o audio
-    # Parámetros de un único registro tabular (Iris)
-    sepal_length: float = Form(None),
-    sepal_width: float = Form(None),
-    petal_length: float = Form(None),
-    petal_width: float = Form(None),
+    file: UploadFile = File(...),
+    arch: str = Form(...),
+    topk: int = Form(3),
 ):
-    # Preprocesar según tipo
-    if data_type == "tabular":
-        values = [sepal_length, sepal_width, petal_length, petal_width]
-        if all(v is not None for v in values):
-            # Predicción con un único registro introducido a mano
-            x = preprocess_tabular_record(values)
-        elif csv_file is not None:
-            temp_path = Path("uploads") / csv_file.filename
-            with open(temp_path, "wb") as f:
-                f.write(await csv_file.read())
-            df = pd.read_csv(temp_path)
-            x, _ = preprocess_tabular(df)  # No hay target en predicción
-        else:
-            return {"error": "Proporciona los 4 parámetros de la flor o un CSV"}
-        
-    elif data_type == "image":
-        x = preprocess_image(await file.read())
-    elif data_type == "audio":
-        x = preprocess_audio(await file.read())
-    else:
-        return {"error": "Tipo de dato no soportado"}
+    """Clasifica una imagen con la arquitectura `arch` y devuelve el top-k."""
+    if arch not in available_archs():
+        raise HTTPException(
+            status_code=422,
+            detail=f"Arquitectura no valida: '{arch}'. Opciones: {available_archs()}",
+        )
+    if topk < 1:
+        raise HTTPException(status_code=400, detail="'topk' debe ser >= 1")
 
-    result = run_inference(x, framework, data_type)
-    return {"prediction": result}
+    content = await file.read()
+    try:
+        x = preprocess_image(content, arch)
+    except (UnidentifiedImageError, OSError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="El archivo no es una imagen valida") from exc
 
-@app.post("/train")
-async def train_model(
-    csv_file: UploadFile,
-    framework: str = Form(...),
-    epochs: int = Form(20),
-    target_column: str = Form(...)  
-):
-    temp_path = Path("uploads") / csv_file.filename
-    with open(temp_path, "wb") as f:
-        f.write(await csv_file.read())
-
-    logger.info(f"Training target_column: {target_column}")
-    X_train, y_train, X_test, y_test = prepare_tabular_data(temp_path, target_column=target_column)
-    logger.info(f"Training data shape: {X_train.shape}, {y_train.shape}")
-    logger.info(f"Test data shape: {X_test.shape}, {y_test.shape}")
-    logger.info(f"X_train dtype: {X_train.dtype}, y_train dtype: {y_train.dtype}")
-
-    if framework.lower() == "pytorch":
-        model_path = trainer_pt.train_tabular(X_train, y_train, X_test, y_test, epochs)
-    else:
-        model_path = trainer_tf.train_tabular(X_train, y_train, X_test, y_test, epochs)
-
-    return {"status": "ok", "saved_model": str(model_path)}
+    result = run_inference(x, arch, topk=topk)
+    return {
+        "arch": arch,
+        "predicted_class": result["predicted_class"],
+        "confidence": result["confidence"],
+        "top_k": result["top_k"],
+        "probabilities": result["probabilities"],
+        "inference_ms": result["inference_ms"],
+        "img_size": get_img_size(arch),
+    }
