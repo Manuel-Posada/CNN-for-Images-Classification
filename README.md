@@ -1,7 +1,7 @@
 # Clasificador de imágenes de animales — CNN / ResNet18 / AlexNet
 
 Sistema completo (backend **FastAPI** + frontend **Streamlit**) para clasificar imágenes
-de animales con tres modelos **PyTorch** entrenados sobre el dataset `animal_data`
+de animales con cuatro modelos **PyTorch** entrenados sobre el dataset `animal_data`
 (15 clases: Bear, Bird, Cat, Cow, Deer, Dog, Dolphin, Elephant, Giraffe, Horse,
 Kangaroo, Lion, Panda, Tiger, Zebra):
 
@@ -9,6 +9,7 @@ Kangaroo, Lion, Panda, Tiger, Zebra):
 |---|---|---|
 | `cnn` | 32 × 32 | CNN desde cero |
 | `resnet18` | 128 × 128 | Transfer learning (pretrained=False) |
+| `resnet18_32` | 32 × 32 | Transfer learning (pretrained=False) |
 | `alexnet` | 128 × 128 | Transfer learning (pretrained=False) |
 
 ## Qué hace la app
@@ -21,7 +22,7 @@ Kangaroo, Lion, Panda, Tiger, Zebra):
      confianza, tiempo de inferencia y rendimiento histórico de la clase predicha.
   2. **Métricas del modelo**: curvas de entrenamiento, matriz de confusión normalizada,
      curvas ROC y tabla de métricas por clase.
-  3. **Comparar modelos**: los tres modelos lado a lado con sus métricas y ROC superpuesta.
+  3. **Comparar modelos**: los cuatro modelos lado a lado con sus métricas y ROC superpuesta.
 
 Toda la información mostrada por la UI se consume de la API; el frontend no recalcula
 métricas.
@@ -35,11 +36,12 @@ CNN-for-Images-Classification/
 ├── models/
 │   ├── pytorch_arch.py          # Arquitecturas: build_model(arch, num_classes, pretrained=False)
 │   ├── pytorch_models.py        # Carga lazy + cacheada de config, métricas y pesos
-│   └── saved/                   # Salidas del notebook (ver "Origen de los modelos")
+│   └── saved/                   # Salidas del notebook (ver "Origen de los modelos") ~305 MB en disco
 │       ├── model_config.json    #  Versionado
 │       ├── metrics.json         #  Versionado
 │       ├── cnn.pth              #  En disco, NO versionado
 │       ├── resnet18.pth         #  En disco, NO versionado
+│       ├── resnet18_32.pth      #  En disco, NO versionado (43 MB)
 │       └── alexnet.pth          #  En disco, NO versionado (217 MB)
 ├── ui/
 │   └── app.py                   # Frontend Streamlit
@@ -47,7 +49,7 @@ CNN-for-Images-Classification/
 │   ├── preprocess.py            # Preprocesado: Resize → ToTensor → Normalize (desde el JSON)
 │   └── inference.py             # Inferencia: softmax, top-k, tiempos
 ├── notebooks/
-│   └── Animal_CNN_TransferLearning_PyTorch.ipynb   # Entrenamiento de los 3 modelos
+│   └── Animal_CNN_TransferLearning_PyTorch.ipynb   # Entrenamiento de los 4 modelos
 ├── doc/                         # Material del curso (presentación)
 ├── requirements.txt
 └── .gitignore
@@ -112,8 +114,9 @@ curl -X POST http://localhost:8000/predict/ \
 
 ## Origen de los modelos y las métricas
 
-Los tres modelos se entrenan (desde cero la CNN y por *transfer learning* ResNet18 y
-AlexNet) en **`notebooks/Animal_CNN_TransferLearning_PyTorch.ipynb`** con el dataset
+Los cuatro modelos se entrenan (desde cero la CNN y por *transfer learning* ResNet18 y
+AlexNet, con `resnet18_32` igual a `resnet18` pero con imágenes de 32×32) en
+**`notebooks/Animal_CNN_TransferLearning_PyTorch.ipynb`** con el dataset
 `animal_data`. Al final del notebook se exportan los pesos y las métricas a:
 
 ```
@@ -124,6 +127,7 @@ models/saved/
 │                       # confusion_matrix, roc, roc_per_class, history
 ├── cnn.pth             # pesos de la CNN (32 px)
 ├── resnet18.pth        # pesos de ResNet18 (128 px)
+├── resnet18_32.pth     # pesos de ResNet18 (32 px)
 └── alexnet.pth         # pesos de AlexNet (128 px)
 ```
 
@@ -135,7 +139,8 @@ models/saved/
 - **Los `.pth` NO están versionados** (`.gitignore`): `alexnet.pth` pesa ~217 MB,
   por encima del límite de GitHub (100 MB por archivo). Si clonas el repositorio,
   genera los pesos ejecutando el notebook y deja los archivos en `models/saved/` con
-  los nombres exactos de `model_config.json` (`cnn.pth`, `resnet18.pth`, `alexnet.pth`).
+  los nombres exactos de `model_config.json` (`cnn.pth`, `resnet18.pth`,
+  `resnet18_32.pth`, `alexnet.pth`).
   Solo los dos JSON viajan en el repositorio.
 - **`pretrained=False`**: las arquitecturas se reconstruyen en blanco (`weights=None`)
   y se cargan los pesos guardados desde disco. Al arrancar el backend **no se descarga
