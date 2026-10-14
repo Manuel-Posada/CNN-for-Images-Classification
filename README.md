@@ -5,12 +5,12 @@ de animales con cuatro modelos **PyTorch** entrenados sobre el dataset `animal_d
 (15 clases: Bear, Bird, Cat, Cow, Deer, Dog, Dolphin, Elephant, Giraffe, Horse,
 Kangaroo, Lion, Panda, Tiger, Zebra):
 
-| Arquitectura | Tamaño de entrada | Tipo |
-|---|---|---|
-| `cnn` | 32 × 32 | CNN desde cero |
-| `resnet18` | 128 × 128 | Transfer learning (pretrained=False) |
-| `resnet18_32` | 32 × 32 | Transfer learning (pretrained=False) |
-| `alexnet` | 128 × 128 | Transfer learning (pretrained=False) |
+| Arquitectura | Tamaño de entrada | Tipo | ¿Incluida en la app? |
+|---|---|---|---|
+| `cnn` | 32 × 32 | CNN desde cero | Sí |
+| `resnet18` | 128 × 128 | Transfer learning (pretrained=False) | Sí |
+| `resnet18_32` | 32 × 32 | Transfer learning (pretrained=False) | No (solo se comparan sus métricas) |
+| `alexnet` | 128 × 128 | Transfer learning (pretrained=False) | No (solo se comparan sus métricas) |
 
 ## Qué hace la app
 
@@ -36,13 +36,13 @@ CNN-for-Images-Classification/
 ├── models/
 │   ├── pytorch_arch.py          # Arquitecturas: build_model(arch, num_classes, pretrained=False)
 │   ├── pytorch_models.py        # Carga lazy + cacheada de config, métricas y pesos
-│   └── saved/                   # Salidas del notebook (ver "Origen de los modelos") ~305 MB en disco
-│       ├── model_config.json    #  Versionado
-│       ├── metrics.json         #  Versionado
-│       ├── cnn.pth              #  En disco, NO versionado
-│       ├── resnet18.pth         #  En disco, NO versionado
-│       ├── resnet18_32.pth      #  En disco, NO versionado (43 MB)
-│       └── alexnet.pth          #  En disco, NO versionado (217 MB)
+│   └── saved/                   # Salidas del notebook (ver "Origen de los modelos")
+│       ├── model_config.json    #  Versionado (campo `included` por modelo)
+│       ├── metrics.json         #  Versionado (métricas de los 4 modelos → comparaciones)
+│       ├── cnn.pth              #  Incluido en la app, NO versionado
+│       ├── resnet18.pth         #  Incluido en la app, NO versionado
+│       # Los pesos pesados (alexnet.pth, resnet18_32.pth) NO se incluyen en esta
+│       # versión; sus métricas sí (metrics.json) para la pestaña "Comparar modelos".
 ├── ui/
 │   └── app.py                   # Frontend Streamlit
 ├── utils/
@@ -99,16 +99,16 @@ por defecto; si el backend corre en otro puerto, usa la variable de entorno
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| `GET` | `/models` | Arquitecturas disponibles: `arch`, `label`, `img_size`, `params_total`, `params_trainable`, `epochs`, `train_time_s`, `ms_per_image`, métricas de test. |
+| `GET` | `/models` | Arquitecturas y sus métricas de test: `arch`, `label`, `included` (si se ofrece en esta versión de la app), `img_size`, `params_total`, `params_trainable`, `epochs`, `train_time_s`, `ms_per_image`. |
 | `GET` | `/models/{arch}/metrics` | Métricas completas de un modelo: `test`, `per_class`, `confusion_matrix`, `roc`, `roc_per_class`, `history`, etc. **404** si la arquitectura no existe. |
-| `POST` | `/predict/` | Multipart con `file` (imagen), `arch` y `topk` (default 3). Devuelve `predicted_class`, `confidence`, `top_k`, `probabilities`, `inference_ms` e `img_size`. Errores: **400** imagen inválida, **404** arquitectura desconocida, **422** validación. |
+| `POST` | `/predict/` | Multipart con `file` (imagen), `arch` y `topk` (default 3). Devuelve `predicted_class`, `confidence`, `top_k`, `probabilities`, `inference_ms` e `img_size`. Errores: **400** imagen inválida, **422** validación / arquitectura desconocida o no incluida, **503** pesos no disponibles en el servidor. |
 
 Ejemplo de predicción con `curl` (Windows PowerShell usa `curl.exe`):
 
 ```bash
 curl -X POST http://localhost:8000/predict/ \
   -F "file=@panda.jpg" \
-  -F "arch=alexnet" \
+  -F "arch=resnet18" \
   -F "topk=3"
 ```
 
@@ -122,26 +122,29 @@ AlexNet, con `resnet18_32` igual a `resnet18` pero con imágenes de 32×32) en
 ```
 models/saved/
 ├── model_config.json   # clases (15), mean/std de normalización (ImageNet),
-│                       # img_size por arquitectura y nombre de su archivo .pth
+│                       # img_size por arquitectura, archivo .pth y `included`
 ├── metrics.json        # métricas completas de evaluación: test, per_class,
 │                       # confusion_matrix, roc, roc_per_class, history
-├── cnn.pth             # pesos de la CNN (32 px)
-├── resnet18.pth        # pesos de ResNet18 (128 px)
-├── resnet18_32.pth     # pesos de ResNet18 (32 px)
-└── alexnet.pth         # pesos de AlexNet (128 px)
+├── cnn.pth             # pesos de la CNN (32 px)       -> incluido en la app
+└── resnet18.pth        # pesos de ResNet18 (128 px)    -> incluido en la app
+                        # resnet18_32.pth y alexnet.pth (más pesados) NO se incluyen
+                        # en esta versión; sus métricas sí (metrics.json)
 ```
 
-- **`model_config.json`** es la fuente de verdad del preprocesado: la API lee de ahí
-  las clases, la media/desviación de normalización y el tamaño de entrada por
-  arquitectura — nada está *hardcodeado* en el código.
+- **`model_config.json`** es la fuente de verdad: la API lee de ahí las clases, la
+  media/desviación de normalización, el tamaño de entrada por arquitectura y el campo
+  `included` — nada está *hardcodeado* en el código.
 - **`metrics.json`** contiene exactamente las métricas que sirve la API
-  (`GET /models/{arch}/metrics`); la UI las muestra sin recalcular nada.
-- **Los `.pth` NO están versionados** (`.gitignore`): `alexnet.pth` pesa ~217 MB,
-  por encima del límite de GitHub (100 MB por archivo). Si clonas el repositorio,
-  genera los pesos ejecutando el notebook y deja los archivos en `models/saved/` con
-  los nombres exactos de `model_config.json` (`cnn.pth`, `resnet18.pth`,
-  `resnet18_32.pth`, `alexnet.pth`).
-  Solo los dos JSON viajan en el repositorio.
+  (`GET /models/{arch}/metrics`), incluidas las de `alexnet` y `resnet18_32`; la UI las
+  muestra sin recalcular nada (pestaña «Comparar modelos»).
+- **`included`** marca qué modelos se ofrecen en esta versión de la app. `cnn` y
+  `resnet18` son ligeros y se incluyen; `alexnet` (~217 MB) y `resnet18_32` (~43 MB) son
+  más pesados, así que quedan con `included: false`: no aparecen en el selector y
+  `/predict/` los rechaza, pero **sus métricas y comparaciones siguen disponibles**.
+- **Los `.pth` NO están versionados** (`.gitignore`): `alexnet.pth` pesa ~217 MB, por
+  encima del límite de GitHub (100 MB por archivo). Si clonas el repositorio, genera los
+  pesos ejecutando el notebook y deja los archivos en `models/saved/` con los nombres
+  exactos de `model_config.json`. Solo los dos JSON viajan en el repositorio.
 - **`pretrained=False`**: las arquitecturas se reconstruyen en blanco (`weights=None`)
   y se cargan los pesos guardados desde disco. Al arrancar el backend **no se descarga
   nada de internet**.

@@ -50,6 +50,16 @@ def available_archs() -> list[str]:
     return list(load_config()["models"].keys())
 
 
+def is_included(arch: str) -> bool:
+    """True si el modelo se incluye en esta version de la app (pesos disponibles).
+
+    Se controla con el campo opcional `included` de `model_config.json` (por
+    defecto True). Los modelos mas pesados pueden marcarse como `included: false`
+    para que la app solo muestre los ligeros, sin perder sus metricas (comparaciones).
+    """
+    return bool(get_model_entry(arch).get("included", True))
+
+
 def get_model_entry(arch: str) -> dict[str, Any]:
     """Entrada de `model_config.json` para una arquitectura. KeyError si no existe."""
     return load_config()["models"][arch]

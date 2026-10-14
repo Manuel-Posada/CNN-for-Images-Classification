@@ -46,6 +46,7 @@
     "alexnet": {
       "label": "AlexNet TL (128px)",
       "weights": "alexnet.pth",
+      "included": false,
       "img_size": 128,
       "test_accuracy": 0.8733,
       "test_balanced_accuracy": 0.872,
@@ -54,6 +55,7 @@
     "resnet18_32": {
       "label": "ResNet18 TL (32px)",
       "weights": "resnet18_32.pth",
+      "included": false,
       "img_size": 32,
       "test_accuracy": 0.3185,
       "test_balanced_accuracy": 0.3175,

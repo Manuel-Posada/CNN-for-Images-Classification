@@ -14,7 +14,13 @@ import logging
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from PIL import UnidentifiedImageError
 
-from models.pytorch_models import available_archs, get_img_size, load_config, load_metrics
+from models.pytorch_models import (
+    available_archs,
+    get_img_size,
+    is_included,
+    load_config,
+    load_metrics,
+)
 from utils.inference import run_inference
 from utils.preprocess import preprocess_image
 
@@ -32,6 +38,7 @@ def list_models() -> list[dict]:
         {
             "arch": arch,
             "label": entry["label"],
+            "included": is_included(arch),
             "img_size": entry["img_size"],
             "test_accuracy": entry.get("test_accuracy"),
             "test_balanced_accuracy": entry.get("test_balanced_accuracy"),
@@ -69,6 +76,14 @@ async def predict(
             status_code=422,
             detail=f"Arquitectura no valida: '{arch}'. Opciones: {available_archs()}",
         )
+    if not is_included(arch):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"El modelo '{arch}' no esta incluido en esta version de la app "
+                "(es mas pesado). Sus metricas siguen disponibles en la comparacion de modelos."
+            ),
+        )
     if topk < 1:
         raise HTTPException(status_code=400, detail="'topk' debe ser >= 1")
 
@@ -78,7 +93,13 @@ async def predict(
     except (UnidentifiedImageError, OSError, ValueError) as exc:
         raise HTTPException(status_code=400, detail="El archivo no es una imagen valida") from exc
 
-    result = run_inference(x, arch, topk=topk)
+    try:
+        result = run_inference(x, arch, topk=topk)
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Los pesos del modelo '{arch}' no estan disponibles en el servidor",
+        ) from exc
     return {
         "arch": arch,
         "predicted_class": result["predicted_class"],
