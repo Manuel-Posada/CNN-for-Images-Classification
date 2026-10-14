@@ -54,7 +54,9 @@ except Exception:
     )
     st.stop()
 
-ARCH_OPTIONS = [m["arch"] for m in MODELS]
+INCLUDED = [m for m in MODELS if m.get("included", True)]
+EXCLUDED = [m for m in MODELS if not m.get("included", True)]
+ARCH_OPTIONS = [m["arch"] for m in INCLUDED]
 
 
 def arch_label(a: str) -> str:
@@ -84,6 +86,14 @@ row2[1].metric("Parámetros entrenables", f'{metrics["params_trainable"]:,}')
 row2[2].metric("Épocas", int(metrics["epochs"]))
 row2[3].metric("Tiempo de entrenamiento", f'{metrics["train_time_s"]:.1f} s')
 row2[4].metric("ms/imagen (evaluación)", f'{metrics["ms_per_image"]:.2f}')
+
+if EXCLUDED:
+    nombres = ", ".join(m["label"] for m in EXCLUDED)
+    st.info(
+        f"Los modelos **{nombres}** son más pesados, por lo que no se incluyen en esta "
+        "versión de la app; sus métricas sí están disponibles y puedes revisar sus "
+        "comparaciones en la pestaña «Comparar modelos»."
+    )
 
 tab_clasif, tab_metricas, tab_compare = st.tabs(
     ["Clasificar imagen", "Métricas del modelo", "Comparar modelos"]
@@ -285,7 +295,7 @@ with tab_compare:
     df_plot = df_cmp[["Accuracy", "Balanced accuracy", "Macro-F1", "ROC AUC macro"]]
     st.bar_chart(df_plot)
 
-    st.write("**ROC macro de los tres modelos**")
+    st.write("**ROC macro por modelo**")
     fig, ax = plt.subplots(figsize=(8, 6))
     for m in MODELS:
         roc_macro = all_metrics[m["arch"]]["roc"]["macro"]
